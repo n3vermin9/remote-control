@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "remote-control-voice"
+version = "0.1.0"
+description = "Offline English voice control for Windows"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "vosk>=0.3.44,<0.4",
+  "sounddevice>=0.4.6,<0.6",
+  "pynput>=1.7.6,<2",
+]
+
+[project.scripts]
+remote-control = "remote_control.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
