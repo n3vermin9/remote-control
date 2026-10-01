@@ -12,7 +12,11 @@ class EasyInstallTests(unittest.TestCase):
         self.assertIn("-m pip install --disable-pip-version-check -e .", installer)
         self.assertIn('"scripts\\download_model.py"', installer)
         self.assertIn("--install-autostart", installer)
-        self.assertNotIn("webcam", installer.casefold())
+        self.assertIn("pip uninstall --yes mediapipe", installer)
+        self.assertIn("opencv-contrib-python", installer)
+        self.assertIn("pynput", installer)
+        self.assertNotIn("hand_landmarker", installer)
+        self.assertNotIn("pose_landmarker", installer)
 
     def test_launcher_starts_hidden_without_f8_mode(self):
         launcher = (ROOT / "START.bat").read_text(encoding="utf-8")
