@@ -1,26 +1,41 @@
 # Remote control
 
-A first working prototype for controlling a Windows PC with **English voice commands**. Speech recognition uses Vosk locally: no cloud API, subscription, account, or per-minute fee is required.
+A Windows desktop interface for controlling a PC with **English voice commands and webcam gestures**. Speech recognition uses Vosk locally and gesture recognition uses MediaPipe locally: no cloud API, subscription, account, or per-minute fee is required.
 
-The default interaction is push-to-talk: hold **F8**, say one command, and release F8. An optional always-listening mode is included.
+The interface discovers installed Windows apps automatically, shows every recognized name, and can launch them with phrases such as **“open Spotify”** or **“launch Visual Studio Code.”** The default voice interaction is push-to-talk: hold **F8**, say one command, and release F8. Always-listening and webcam gesture modes are also included.
 
 ## Easy Windows installation
 
 1. On GitHub, click **Code → Download ZIP**, then extract the ZIP.
 2. Open the extracted `remote-control-main` folder.
-3. Double-click **`INSTALL.bat`**. It creates an isolated environment, installs the app, and downloads the offline English model automatically.
+3. Double-click **`INSTALL.bat`**. It creates an isolated environment, installs the app, and downloads the offline English voice and gesture models automatically.
 4. Double-click **`START.bat`** whenever you want to run the recommended push-to-talk mode.
 
 For continuous listening, double-click **`START_ALWAYS_LISTENING.bat`** instead. The launchers automatically start `INSTALL.bat` if setup has not been completed yet. `START_F8.bat` is also included as an explicit name for the default mode.
 
-The only prerequisite is 64-bit Python 3.9–3.12. If Python is missing, the installer shows the official download address and the exact option to select. Installation needs internet once for the free dependencies and speech model; normal use is fully offline.
+The only prerequisite is 64-bit Python 3.9–3.12. If Python is missing, the installer shows the official download address and the exact option to select. Installation needs internet once for the free dependencies and models; normal use is fully offline.
 
 ## Privacy and cost
 
-- Microphone audio is processed in memory on this PC and is not saved or uploaded.
+- Microphone audio and webcam frames are processed in memory on this PC and are not saved or uploaded by Remote control.
 - Recognition works without internet after the model has been downloaded once.
 - The model and Python libraries are free and open source. No API key is used.
-- `scripts/download_model.py` makes one HTTPS download from the official Vosk model host. You can instead download and copy the model manually from another computer.
+- `scripts/download_model.py` downloads the speech model from Vosk and the hand/pose models from Google's official MediaPipe model host. You can instead download and copy the models manually from another computer.
+
+## Interface
+
+The GUI opens automatically and contains:
+
+- Voice mode controls for F8 and always-listening modes.
+- A webcam preview with start/stop controls.
+- Buttons for volume, mute, play/pause, and changing songs.
+- A text command box for testing without a microphone.
+- A searchable **Installed apps** tab containing the names available to voice control.
+- A live activity log showing recognized commands and actions.
+
+Webcam access is off until **Start webcam** is clicked. Voice control starts automatically in the selected mode.
+
+For troubleshooting or automation without the GUI, run `remote-control --headless`. Use `remote-control --list-apps` to print the discovered app names.
 
 ## Manual Windows setup
 
@@ -69,22 +84,37 @@ Press Ctrl+C to stop. To make always-listening persistent, run the app once so i
 
 | Say | Result |
 | --- | --- |
-| `open notepad` | Opens Windows Notepad |
-| `open calculator` | Opens Windows Calculator |
+| `open Spotify` | Opens Spotify if installed |
+| `start Photoshop` | Opens Photoshop if installed |
+| `launch Visual Studio Code` | Opens Visual Studio Code if installed |
 | `volume up` / `volume down` | Changes system volume one step |
 | `mute` / `unmute` | Toggles system mute |
 | `play` / `pause` | Toggles media playback |
-| `next track` / `previous track` | Changes media track |
+| `next song` / `previous song` | Changes song |
 | `show commands` | Prints help |
 | `quit remote control` | Exits the program |
+
+App names are rebuilt at startup from the Windows Start Menu, registered App Paths, and Windows `Get-StartApps` catalog. The GUI shows the exact recognized list. This covers normal desktop programs, Start Menu shortcuts, and Microsoft Store apps without allowing arbitrary voice-generated shell commands.
+
+## Webcam gestures
+
+Click **Start webcam** in the interface and keep your upper body and hands visible:
+
+| Gesture | Result |
+| --- | --- |
+| Move from sitting to standing | Play/pause |
+| Swipe one hand left | Previous song |
+| Swipe one hand right | Next song |
+
+Standing detection uses knee angles, so the camera must see the hips, knees, and ankles. The first detected standing pose does not trigger playback; the app must first observe a seated pose. Swipes use deliberate horizontal wrist movement and a cooldown to reduce accidental repeated commands. Lighting, camera angle, occlusion, and motion blur affect reliability.
 
 The prototype intentionally contains no shutdown, restart, file deletion, shell-command, or arbitrary-program command. Therefore none of the current commands needs a confirmation prompt. Any future disruptive command should set `needs_confirmation=True` and be confirmed by an interaction policy before it reaches the platform controller.
 
 ## Model, speed, and memory expectations
 
-The default `vosk-model-small-en-us-0.15` download is about **40 MB** compressed and roughly **70 MB** after extraction. Vosk describes small models as suitable for desktop and mobile use; in practice, budget roughly **200–350 MB total RAM** for Python, Vosk, and the model. Actual use varies by Python build and audio driver.
+The default `vosk-model-small-en-us-0.15` download is about **40 MB** compressed and roughly **70 MB** after extraction. The MediaPipe hand and lightweight pose task models add roughly **15 MB**, while OpenCV, MediaPipe, and their runtime dependencies make the initial Python installation substantially larger. Budget roughly **300–700 MB RAM** when voice, GUI, and webcam recognition are all active. Actual use varies by camera resolution, Python build, and audio/video drivers.
 
-The recognizer automatically uses the selected microphone's native default sample rate. A lightweight small English-only model and a constrained grammar (only supported command phrases) reduce recognition latency and false matches. This should work on ordinary 64-bit Windows 10/11 hardware without a GPU. Very noisy rooms, far-field microphones, and strong accents can still reduce accuracy.
+The recognizer automatically uses the selected microphone's native default sample rate. A lightweight small English-only model and a grammar containing the base commands plus discovered app names reduce recognition latency and false matches. Webcam processing uses CPU by default. This should work on ordinary 64-bit Windows 10/11 hardware without a GPU, though webcam gestures benefit from a modern multi-core CPU. Very noisy rooms, far-field microphones, and strong accents can still reduce voice accuracy.
 
 To inspect microphone device numbers:
 
@@ -98,10 +128,15 @@ Set `input_device` to the desired numeric device ID in `%LOCALAPPDATA%\RemoteCon
 
 ```text
 VoiceAdapter → recognized text → CommandParser → CommandExecutor → WindowsController
+GUI buttons/text ───────────────────────┤
+Camera gestures ────────────────────────┤
 future Telegram adapter ────────────────┘
 ```
 
 - `adapters/voice.py` owns F8 and always-listening behavior.
+- `adapters/camera.py` turns local hand/body landmarks into debounced gestures.
+- `app_catalog.py` discovers installed applications and safe launch targets.
+- `gui.py` provides the Windows desktop interface.
 - `speech/vosk_recognizer.py` owns local speech-to-text.
 - `commands.py` converts exact phrases into typed actions.
 - `executor.py` is input-agnostic and applies command policy.

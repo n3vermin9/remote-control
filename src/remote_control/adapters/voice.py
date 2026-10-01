@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import Callable
+from typing import Callable, Optional
 
 from pynput import keyboard
 
@@ -23,6 +23,16 @@ class VoiceAdapter:
         self.mode = mode
         self.timeout_seconds = timeout_seconds
         self.status = status
+        self._stop_event = threading.Event()
+        self._wake_event: Optional[threading.Event] = None
+        self._release_event: Optional[threading.Event] = None
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._wake_event:
+            self._wake_event.set()
+        if self._release_event:
+            self._release_event.set()
 
     def run(self, on_text: TextHandler) -> None:
         if self.mode == "always":
@@ -32,8 +42,10 @@ class VoiceAdapter:
 
     def _run_always(self, on_text: TextHandler) -> None:
         self.status("Always-listening mode active. Press Ctrl+C to stop.")
-        while True:
-            text = self.recognizer.listen_once(threading.Event(), self.timeout_seconds, self.status)
+        while not self._stop_event.is_set():
+            text = self.recognizer.listen_once(
+                self._stop_event, self.timeout_seconds, self.status
+            )
             if text and not on_text(text):
                 return
 
@@ -42,6 +54,8 @@ class VoiceAdapter:
         pressed = threading.Event()
         released = threading.Event()
         quit_event = threading.Event()
+        self._wake_event = pressed
+        self._release_event = released
 
         def on_press(key) -> None:  # noqa: ANN001
             if key == keyboard.Key.f8 and not pressed.is_set():
@@ -55,9 +69,11 @@ class VoiceAdapter:
         listener = keyboard.Listener(on_press=on_press, on_release=on_release)
         listener.start()
         try:
-            while not quit_event.is_set():
+            while not quit_event.is_set() and not self._stop_event.is_set():
                 pressed.wait()
                 pressed.clear()
+                if self._stop_event.is_set():
+                    break
                 text = self.recognizer.listen_once(released, self.timeout_seconds, self.status)
                 if text:
                     if not on_text(text):

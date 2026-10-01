@@ -5,7 +5,7 @@ import queue
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
@@ -21,6 +21,7 @@ class VoskRecognizer:
         model_path: Path,
         input_device: Optional[int] = None,
         sample_rate: Optional[int] = None,
+        phrases: Optional[Iterable[str]] = None,
     ) -> None:
         import sounddevice as sd
 
@@ -35,9 +36,10 @@ class VoskRecognizer:
         device_info = sd.query_devices(input_device, "input")
         detected_rate = int(device_info["default_samplerate"])
         self.sample_rate = int(sample_rate or detected_rate or 16000)
+        self.phrases = list(phrases or grammar_phrases())
 
     def _new_decoder(self) -> KaldiRecognizer:
-        grammar = json.dumps(grammar_phrases())
+        grammar = json.dumps(self.phrases)
         return KaldiRecognizer(self._model, self.sample_rate, grammar)
 
     def listen_once(

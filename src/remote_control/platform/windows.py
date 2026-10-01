@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import ctypes
+import os
 import subprocess
 import sys
+from typing import Optional
+
+from ..app_catalog import AppCatalog
 
 
 # Windows virtual-key codes for hardware media keys.
@@ -16,9 +20,10 @@ KEYEVENTF_KEYUP = 0x0002
 
 
 class WindowsController:
-    def __init__(self) -> None:
+    def __init__(self, app_catalog: Optional[AppCatalog] = None) -> None:
         if sys.platform != "win32":
             raise RuntimeError("Command execution is supported on Windows only.")
+        self.app_catalog = app_catalog or AppCatalog()
 
     @staticmethod
     def _launch(executable: str) -> None:
@@ -35,6 +40,20 @@ class WindowsController:
 
     def open_calculator(self) -> None:
         self._launch("calc.exe")
+
+    def open_app(self, spoken_name: str) -> str:
+        entry = self.app_catalog.find(spoken_name)
+        if entry is None:
+            raise ValueError(f"Application not found: {spoken_name}")
+        if entry.kind == "aumid":
+            subprocess.Popen(
+                ["explorer.exe", f"shell:AppsFolder\\{entry.target}"], close_fds=True
+            )
+        elif hasattr(os, "startfile"):
+            os.startfile(entry.target)  # type: ignore[attr-defined]
+        else:
+            self._launch(entry.target)
+        return entry.name
 
     def volume_up(self) -> None:
         self._press_media_key(VK_VOLUME_UP)
