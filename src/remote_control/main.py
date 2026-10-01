@@ -85,7 +85,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(result.message)
         return not result.should_quit
 
-    print(f"Remote control 0.2.0 | mode={mode} | sample rate={recognizer.sample_rate} Hz")
+    print(f"Remote control 0.3.0 | mode={mode} | sample rate={recognizer.sample_rate} Hz")
     try:
         VoiceAdapter(recognizer, mode, settings.command_timeout_seconds).run(handle_text)
     except KeyboardInterrupt:

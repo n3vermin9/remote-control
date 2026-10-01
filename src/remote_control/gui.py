@@ -45,9 +45,12 @@ class RemoteControlGUI:
         self.mode = tk.StringVar(value=initial_mode)
         self.voice_status = tk.StringVar(value="Voice stopped")
         self.camera_status = tk.StringVar(value="Webcam stopped")
+        self.camera_index = tk.StringVar(value=str(settings.camera_index))
         self.app_filter = tk.StringVar()
         self.command_text = tk.StringVar()
         self._camera_photo = None
+        self._latest_frame = None
+        self._frame_lock = threading.Lock()
 
         self._configure_style()
         self._build_ui()
@@ -106,6 +109,14 @@ class RemoteControlGUI:
         ttk.Label(camera, text="Stand up: play/pause   •   Swipe left/right: previous/next song").pack(anchor="w")
         camera_buttons = ttk.Frame(camera)
         camera_buttons.pack(anchor="w", pady=(8, 0))
+        ttk.Label(camera_buttons, text="Camera:").pack(side="left", padx=(0, 4))
+        ttk.Combobox(
+            camera_buttons,
+            textvariable=self.camera_index,
+            values=("0", "1", "2", "3", "4", "5"),
+            width=3,
+            state="readonly",
+        ).pack(side="left", padx=(0, 8))
         ttk.Button(camera_buttons, text="Start webcam", command=self.start_camera, style="Action.TButton").pack(side="left")
         ttk.Button(camera_buttons, text="Stop", command=self.stop_camera, style="Action.TButton").pack(side="left", padx=6)
 
@@ -124,14 +135,20 @@ class RemoteControlGUI:
             ("Previous song", Action.MEDIA_PREVIOUS),
             ("Play / Pause", Action.MEDIA_PLAY_PAUSE),
             ("Next song", Action.MEDIA_NEXT),
+            ("Show desktop", Action.SHOW_DESKTOP),
+            ("Switch window", Action.SWITCH_WINDOW),
+            ("Screenshot", Action.SCREENSHOT),
         ):
+            index = len(quick.winfo_children())
             ttk.Button(
                 quick,
                 text=label,
                 command=lambda item=action, text=label: self.execute(
                     Command(item, text.lower())
                 ),
-            ).pack(side="left", padx=(0, 5), pady=3)
+            ).grid(row=index // 3, column=index % 3, sticky="ew", padx=3, pady=3)
+        for column in range(3):
+            quick.columnconfigure(column, weight=1)
 
         ttk.Label(apps_tab, text="Search the app names available to voice control:").pack(anchor="w")
         filter_entry = ttk.Entry(apps_tab, textvariable=self.app_filter)
@@ -143,9 +160,11 @@ class RemoteControlGUI:
         ttk.Label(apps_tab, text='Say “open” followed by any name here, or double-click an app.').pack(anchor="w", pady=(8, 0))
 
         help_text = (
-            "APP CONTROL\n  open / start / launch + any installed app name\n\n"
-            "MEDIA\n  play • pause • next song • previous song\n\n"
-            "VOLUME\n  volume up • volume down • mute • unmute\n\n"
+            "APP CONTROL\n  open / open up / start / launch / run + installed app name\n\n"
+            "MEDIA\n  play • pause • resume • stop music • next song • previous song\n\n"
+            "VOLUME\n  volume up • louder • volume down • quieter • mute • unmute\n\n"
+            "WINDOWS\n  show desktop • minimize window • maximize window • switch window\n"
+            "  screenshot • browser back/forward • scroll up/down\n\n"
             "SYSTEM\n  show commands • quit remote control\n\n"
             "WEBCAM\n  stand up → play/pause\n  swipe hand left → previous song\n  swipe hand right → next song"
         )
@@ -172,6 +191,10 @@ class RemoteControlGUI:
             self.handle_text(f"open {name}")
 
     def post(self, kind: str, value: object) -> None:
+        if kind == "frame":
+            with self._frame_lock:
+                self._latest_frame = value
+            return
         self.events.put((kind, value))
 
     def _drain_events(self) -> None:
@@ -190,6 +213,11 @@ class RemoteControlGUI:
                     messagebox.showerror("Remote control", str(value))
         except queue.Empty:
             pass
+        with self._frame_lock:
+            frame = self._latest_frame
+            self._latest_frame = None
+        if frame is not None:
+            self._show_frame(frame)
         self.root.after(60, self._drain_events)
 
     def _append_log(self, message: str) -> None:
@@ -260,6 +288,8 @@ class RemoteControlGUI:
 
     def start_camera(self) -> None:
         self.stop_camera()
+        self.settings.camera_index = int(self.camera_index.get())
+        self.settings.save()
         adapter = CameraGestureAdapter(
             HAND_MODEL_PATH,
             POSE_MODEL_PATH,
@@ -294,6 +324,8 @@ class RemoteControlGUI:
             self.camera_adapter.stop()
             self.camera_adapter = None
         self.camera_status.set("Webcam stopped")
+        self.camera_preview.configure(image="", text="Camera preview")
+        self._camera_photo = None
 
     def close(self) -> None:
         self.stop_voice()

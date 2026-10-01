@@ -13,6 +13,38 @@ StatusHandler = Callable[[str], None]
 FrameHandler = Callable[[object], None]
 
 
+def open_camera(cv2, camera_index: int):  # noqa: ANN001
+    """Try Windows camera backends in a compatibility-first order."""
+    candidates = (
+        ("DirectShow", getattr(cv2, "CAP_DSHOW", None)),
+        ("Media Foundation", getattr(cv2, "CAP_MSMF", None)),
+        ("Automatic", getattr(cv2, "CAP_ANY", 0)),
+    )
+    tried = set()
+    for name, backend in candidates:
+        if backend is None or backend in tried:
+            continue
+        tried.add(backend)
+        capture = None
+        try:
+            capture = cv2.VideoCapture(camera_index, backend)
+            if capture.isOpened():
+                capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                capture.set(cv2.CAP_PROP_FPS, 15)
+                if hasattr(cv2, "CAP_PROP_BUFFERSIZE"):
+                    capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                return capture, name
+        except Exception:
+            pass
+        if capture is not None:
+            capture.release()
+    raise RuntimeError(
+        f"Could not open camera {camera_index}. Try another camera number and "
+        "check Windows Settings > Privacy & security > Camera."
+    )
+
+
 def joint_angle(a, b, c) -> float:  # noqa: ANN001
     """Return the angle ABC in degrees for normalized landmark objects."""
     first = math.atan2(c.y - b.y, c.x - b.x)
@@ -89,8 +121,12 @@ class CameraGestureAdapter:
 
         vision = mp.tasks.vision
         base_options = mp.tasks.BaseOptions
+        cpu_delegate = base_options.Delegate.CPU
         hand_options = vision.HandLandmarkerOptions(
-            base_options=base_options(model_asset_path=str(self.hand_model_path)),
+            base_options=base_options(
+                model_asset_path=str(self.hand_model_path),
+                delegate=cpu_delegate,
+            ),
             running_mode=vision.RunningMode.VIDEO,
             num_hands=1,
             min_hand_detection_confidence=0.6,
@@ -98,7 +134,10 @@ class CameraGestureAdapter:
             min_tracking_confidence=0.6,
         )
         pose_options = vision.PoseLandmarkerOptions(
-            base_options=base_options(model_asset_path=str(self.pose_model_path)),
+            base_options=base_options(
+                model_asset_path=str(self.pose_model_path),
+                delegate=cpu_delegate,
+            ),
             running_mode=vision.RunningMode.VIDEO,
             num_poses=1,
             min_pose_detection_confidence=0.6,
@@ -106,26 +145,31 @@ class CameraGestureAdapter:
             min_tracking_confidence=0.6,
         )
 
-        backend = cv2.CAP_DSHOW if hasattr(cv2, "CAP_DSHOW") else 0
-        capture = cv2.VideoCapture(self.camera_index, backend)
-        capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        capture.set(cv2.CAP_PROP_FPS, 15)
-        if not capture.isOpened():
-            capture.release()
-            raise RuntimeError(f"Could not open camera {self.camera_index}.")
+        capture, backend_name = open_camera(cv2, self.camera_index)
 
         interpreter = GestureInterpreter()
         last_timestamp = 0
-        self.status("Webcam gestures active: stand up, or swipe a hand left/right.")
+        frame_number = 0
+        failed_frames = 0
+        hand_visible = False
+        pose_visible = False
+        self.status(f"Camera {self.camera_index} active using {backend_name}. Warming up…")
         try:
             with vision.HandLandmarker.create_from_options(hand_options) as hands, \
                     vision.PoseLandmarker.create_from_options(pose_options) as poses:
                 while not self._stop_event.is_set():
                     ok, frame = capture.read()
                     if not ok:
-                        self.status("Camera frame could not be read.")
-                        break
+                        failed_frames += 1
+                        if failed_frames >= 20:
+                            raise RuntimeError(
+                                "The camera opened but stopped providing frames. Close other "
+                                "camera apps or select a different camera number."
+                            )
+                        time.sleep(0.05)
+                        continue
+                    failed_frames = 0
+                    frame_number += 1
                     frame = cv2.flip(frame, 1)
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
@@ -133,23 +177,39 @@ class CameraGestureAdapter:
                     last_timestamp = timestamp
 
                     hand_result = hands.detect_for_video(image, timestamp)
+                    hand_visible = bool(hand_result.hand_landmarks)
                     if hand_result.hand_landmarks:
                         wrist = hand_result.hand_landmarks[0][0]
                         gesture = interpreter.update_hand(wrist.x, time.monotonic())
                         if gesture:
                             on_gesture(gesture)
+                    else:
+                        interpreter.hand_history.clear()
 
-                    pose_result = poses.detect_for_video(image, timestamp)
-                    if pose_result.pose_landmarks:
-                        landmarks = pose_result.pose_landmarks[0]
-                        angles = []
-                        for hip, knee, ankle in ((23, 25, 27), (24, 26, 28)):
-                            points = (landmarks[hip], landmarks[knee], landmarks[ankle])
-                            if all((point.visibility or 0) >= 0.45 for point in points):
-                                angles.append(joint_angle(*points))
-                        gesture = interpreter.update_pose(angles, time.monotonic())
-                        if gesture:
-                            on_gesture(gesture)
+                    # Pose estimation is heavier than hand tracking. Running it every
+                    # third frame keeps the preview responsive on ordinary CPUs.
+                    if frame_number % 3 == 0:
+                        pose_result = poses.detect_for_video(image, timestamp)
+                        pose_visible = bool(pose_result.pose_landmarks)
+                        if pose_result.pose_landmarks:
+                            landmarks = pose_result.pose_landmarks[0]
+                            angles = []
+                            for hip, knee, ankle in ((23, 25, 27), (24, 26, 28)):
+                                points = (landmarks[hip], landmarks[knee], landmarks[ankle])
+                                if all((point.visibility or 0) >= 0.3 for point in points):
+                                    angles.append(joint_angle(*points))
+                            gesture = interpreter.update_pose(angles, time.monotonic())
+                            if gesture:
+                                on_gesture(gesture)
+
+                    if frame_number % 15 == 0:
+                        hand_state = "hand ready" if hand_visible else "show one hand"
+                        pose_state = interpreter.pose_state or (
+                            "body ready" if pose_visible else "show full body"
+                        )
+                        self.status(
+                            f"Camera {self.camera_index} • {hand_state} • {pose_state}"
+                        )
 
                     if on_frame:
                         on_frame(rgb)

@@ -44,6 +44,26 @@ class CommandTests(unittest.TestCase):
         self.assertIn("open visual studio code", phrases)
         self.assertIn("start visual studio code", phrases)
         self.assertIn("launch visual studio code", phrases)
+        self.assertIn("run visual studio code", phrases)
+        self.assertIn("open up visual studio code", phrases)
+
+    def test_common_variations_map_to_safe_actions(self):
+        cases = {
+            "make it louder": Action.VOLUME_UP,
+            "make it quieter": Action.VOLUME_DOWN,
+            "resume music": Action.MEDIA_PLAY_PAUSE,
+            "skip this song": Action.MEDIA_NEXT,
+            "back one song": Action.MEDIA_PREVIOUS,
+            "show desktop": Action.SHOW_DESKTOP,
+            "maximize this window": Action.MAXIMIZE_WINDOW,
+            "capture screen": Action.SCREENSHOT,
+            "previous page": Action.BROWSER_BACK,
+            "scroll down": Action.SCROLL_DOWN,
+        }
+        parser = CommandParser()
+        for phrase, action in cases.items():
+            with self.subTest(phrase=phrase):
+                self.assertEqual(parser.parse(phrase).action, action)
 
     def test_executor_opens_dynamic_app(self):
         controller = FakeController()

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "remote-control-voice"
-version = "0.2.0"
+version = "0.3.0"
 description = "Offline voice, GUI, and webcam gesture control for Windows"
 readme = "README.md"
 requires-python = ">=3.9,<3.13"

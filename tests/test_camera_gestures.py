@@ -1,12 +1,47 @@
 import unittest
 
-from remote_control.adapters.camera import GestureInterpreter, joint_angle
+from remote_control.adapters.camera import GestureInterpreter, joint_angle, open_camera
 
 
 class Point:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+
+
+class FakeCapture:
+    def __init__(self, opened):
+        self.opened = opened
+        self.released = False
+        self.properties = []
+
+    def isOpened(self):
+        return self.opened
+
+    def set(self, key, value):
+        self.properties.append((key, value))
+
+    def release(self):
+        self.released = True
+
+
+class FakeCv2:
+    CAP_DSHOW = 1
+    CAP_MSMF = 2
+    CAP_ANY = 0
+    CAP_PROP_FRAME_WIDTH = 3
+    CAP_PROP_FRAME_HEIGHT = 4
+    CAP_PROP_FPS = 5
+    CAP_PROP_BUFFERSIZE = 6
+
+    def __init__(self, successful_backend=None):
+        self.successful_backend = successful_backend
+        self.captures = []
+
+    def VideoCapture(self, index, backend):
+        capture = FakeCapture(backend == self.successful_backend)
+        self.captures.append((index, backend, capture))
+        return capture
 
 
 class CameraGestureTests(unittest.TestCase):
@@ -34,3 +69,15 @@ class CameraGestureTests(unittest.TestCase):
         self.assertAlmostEqual(
             joint_angle(Point(0, 0), Point(0, 1), Point(0, 2)), 180.0
         )
+
+    def test_camera_falls_back_from_directshow_to_media_foundation(self):
+        cv2 = FakeCv2(successful_backend=FakeCv2.CAP_MSMF)
+        capture, backend = open_camera(cv2, 2)
+        self.assertEqual(backend, "Media Foundation")
+        self.assertIs(capture, cv2.captures[1][2])
+        self.assertTrue(cv2.captures[0][2].released)
+        self.assertEqual(cv2.captures[0][0], 2)
+
+    def test_camera_error_suggests_actionable_fixes(self):
+        with self.assertRaisesRegex(RuntimeError, "another camera number"):
+            open_camera(FakeCv2(), 0)

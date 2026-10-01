@@ -91,10 +91,19 @@ Press Ctrl+C to stop. To make always-listening persistent, run the app once so i
 | `mute` / `unmute` | Toggles system mute |
 | `play` / `pause` | Toggles media playback |
 | `next song` / `previous song` | Changes song |
+| `stop music` | Stops media playback |
+| `show desktop` | Shows or restores the desktop |
+| `minimize window` / `maximize window` | Controls the foreground window |
+| `switch window` | Switches to the next window |
+| `take screenshot` | Copies a full-screen screenshot to the clipboard |
+| `browser back` / `browser forward` | Navigates the active browser or supported app |
+| `scroll up` / `scroll down` | Scrolls the active window |
 | `show commands` | Prints help |
 | `quit remote control` | Exits the program |
 
 App names are rebuilt at startup from the Windows Start Menu, registered App Paths, and Windows `Get-StartApps` catalog. The GUI shows the exact recognized list. This covers normal desktop programs, Start Menu shortcuts, and Microsoft Store apps without allowing arbitrary voice-generated shell commands.
+
+Natural variations are accepted. Examples include `open up Spotify`, `run Spotify`, `make it louder`, `turn it down`, `resume music`, `skip this song`, `back one song`, `capture screen`, `previous page`, and `page down`.
 
 ## Webcam gestures
 
@@ -107,6 +116,8 @@ Click **Start webcam** in the interface and keep your upper body and hands visib
 | Swipe one hand right | Next song |
 
 Standing detection uses knee angles, so the camera must see the hips, knees, and ankles. The first detected standing pose does not trigger playback; the app must first observe a seated pose. Swipes use deliberate horizontal wrist movement and a cooldown to reduce accidental repeated commands. Lighting, camera angle, occlusion, and motion blur affect reliability.
+
+If camera `0` is not the desired webcam, select camera `1`–`5` beside **Start webcam**. The app automatically tries DirectShow, Media Foundation, and Windows' automatic backend, keeps only the newest preview frame, and tolerates brief dropped frames. The status line reports whether a hand and full body are visible. Close Teams, Zoom, OBS, or another program if it has exclusive control of the camera.
 
 The prototype intentionally contains no shutdown, restart, file deletion, shell-command, or arbitrary-program command. Therefore none of the current commands needs a confirmation prompt. Any future disruptive command should set `needs_confirmation=True` and be confirmed by an interaction policy before it reaches the platform controller.
 
