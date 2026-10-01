@@ -1,6 +1,6 @@
 import unittest
 
-from remote_control.adapters.telegram import TelegramAdapter
+from remote_control.adapters.telegram import TelegramAdapter, TelegramResponse
 
 
 class FakeTelegramAdapter(TelegramAdapter):
@@ -35,9 +35,26 @@ class TelegramAdapterTests(unittest.TestCase):
         ]
         adapter = FakeTelegramAdapter(20, updates)
         commands = []
-        adapter.run(lambda text: commands.append(text) or "done")
+        adapter.run(lambda text: commands.append(text) or TelegramResponse("done"))
         self.assertEqual(commands, ["volume 30"])
         self.assertEqual(adapter.sent, [(20, "done")])
+
+    def test_exit_is_requested_only_after_reply(self):
+        updates = [
+            {"update_id": 1, "message": {"text": "quit remote control", "chat": {"id": 20, "type": "private"}}},
+        ]
+        adapter = FakeTelegramAdapter(20, updates)
+        adapter.run(lambda _text: TelegramResponse("Stopping Remote control", should_exit=True))
+        self.assertEqual(adapter.sent, [(20, "Stopping Remote control")])
+        self.assertTrue(adapter.exit_requested)
+
+    def test_status_does_not_reach_command_executor(self):
+        updates = [
+            {"update_id": 1, "message": {"text": "/status", "chat": {"id": 20, "type": "private"}}},
+        ]
+        adapter = FakeTelegramAdapter(20, updates)
+        adapter.run(lambda _text: self.fail("Status reached command executor"))
+        self.assertEqual(adapter.sent, [(20, "Remote control is online and ready.")])
 
     def test_id_is_available_before_pairing(self):
         updates = [

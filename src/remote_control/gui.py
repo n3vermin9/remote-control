@@ -9,7 +9,7 @@ from typing import Optional
 import pystray
 from PIL import Image, ImageDraw
 
-from .adapters.telegram import TelegramAdapter
+from .adapters.telegram import TelegramAdapter, TelegramResponse
 from .app_catalog import AppCatalog
 from .autostart import autostart_enabled, install_autostart, remove_autostart
 from .commands import CommandParser
@@ -147,7 +147,7 @@ class RemoteControlGUI:
             "WINDOWS\n  show desktop • minimize/maximize/switch/close window • screenshot\n\n"
             "EDITING\n  copy • cut • paste • undo • redo • select all • enter • escape\n\n"
             "BROWSER\n  new/close/reopen tab • refresh • back/forward • zoom in/out/reset\n\n"
-            "BOT\n  /id • /start • /help • /commands\n\n"
+            "BOT\n  /id • /status • /ping • /start • /help • /commands\n\n"
             "SYSTEM\n  show commands • quit remote control"
         )
         ttk.Label(commands_tab, text=help_text, font=("Segoe UI", 12), justify="left").pack(
@@ -238,23 +238,21 @@ class RemoteControlGUI:
         self.log.see("end")
         self.log.configure(state="disabled")
 
-    def handle_telegram_command(self, text: str) -> str:
+    def handle_telegram_command(self, text: str) -> TelegramResponse:
         self.post("log", f'Telegram command: "{text}"')
         command = self.command_parser.parse(text)
         if command is None:
             message = "Command not recognized. Send /commands for the supported list."
             self.post("log", message)
-            return message
+            return TelegramResponse(message)
         try:
             result = self.executor.execute(command)
             self.post("log", result.message)
-            if result.should_quit:
-                self.root.after(500, self.exit_app)
-            return result.message
+            return TelegramResponse(result.message, should_exit=result.should_quit)
         except Exception as error:
             message = f"Command failed: {error}"
             self.post("log", message)
-            return message
+            return TelegramResponse(message)
 
     def save_and_connect(self) -> None:
         token = self.telegram_token.get().strip()
@@ -286,6 +284,8 @@ class RemoteControlGUI:
         def worker() -> None:
             try:
                 adapter.run(self.handle_telegram_command)
+                if adapter.exit_requested:
+                    self.root.after(0, self.exit_app)
             except Exception as error:
                 self.post("error", f"Telegram control stopped: {error}")
             finally:

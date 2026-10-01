@@ -26,6 +26,8 @@ The bot token is stored locally under `%LOCALAPPDATA%\RemoteControlTelegram\conf
 
 Telegram control needs an internet connection. The app uses Telegram’s HTTPS Bot API with long polling; it does not expose an inbound server or require router configuration.
 
+Queued messages are cleared whenever the desktop app establishes a fresh bot session, so commands sent while the PC was offline are not replayed later.
+
 ## Running in the tray
 
 Remote control starts with Windows and stays in the system tray. Closing the setup window keeps the bot active. Double-click the tray icon to reopen setup, or choose **Exit** to stop it.
@@ -59,7 +61,7 @@ App closing sends the normal Windows close request, allowing apps to prompt abou
 - `copy`, `cut`, `paste`, `undo`, `redo`, `select all`, `press enter`, `press escape`
 - `new tab`, `close tab`, `reopen tab`, `refresh`, `zoom in`, `zoom out`, `reset zoom`
 
-Send `/commands`, `/help`, or `/start` for the command list. Send `quit remote control` to exit the tray app.
+Send `/commands`, `/help`, or `/start` for the command list. Send `/status` or `/ping` to confirm the PC controller is online. Send `quit remote control` to exit the tray app.
 
 ## Safety model
 

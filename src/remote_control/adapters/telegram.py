@@ -5,10 +5,17 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from typing import Callable, Optional
 
 
-CommandHandler = Callable[[str], str]
+@dataclass(frozen=True)
+class TelegramResponse:
+    text: str
+    should_exit: bool = False
+
+
+CommandHandler = Callable[[str], TelegramResponse]
 StatusHandler = Callable[[str], None]
 
 
@@ -29,6 +36,7 @@ class TelegramAdapter:
         self.status = status
         self._stop_event = threading.Event()
         self._offset: Optional[int] = None
+        self.exit_requested = False
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -46,19 +54,33 @@ class TelegramAdapter:
         except urllib.error.HTTPError as error:
             if error.code == 401:
                 raise RuntimeError("Telegram rejected the bot token.") from None
+            if error.code == 409:
+                raise RuntimeError(
+                    "Another copy of this bot is already connected to Telegram."
+                ) from None
+            if error.code == 429 or error.code >= 500:
+                raise urllib.error.URLError("Telegram is temporarily unavailable.") from None
             raise RuntimeError(f"Telegram request failed with status {error.code}.") from None
         if not payload.get("ok"):
             raise RuntimeError("Telegram rejected the request.")
         return payload.get("result")
 
     def send_message(self, chat_id: int, text: str) -> None:
-        self._request("sendMessage", {"chat_id": chat_id, "text": text[:4096]})
+        for attempt in range(3):
+            try:
+                self._request("sendMessage", {"chat_id": chat_id, "text": text[:4096]})
+                return
+            except urllib.error.URLError:
+                if attempt == 2:
+                    raise RuntimeError("Could not send the Telegram reply.") from None
+                self.status("Telegram reply delayed; retrying…")
+                self._stop_event.wait(2)
 
     def run(self, on_command: CommandHandler) -> None:
         while not self._stop_event.is_set():
             try:
                 identity = self._request("getMe", {})
-                self._request("deleteWebhook", {})
+                self._request("deleteWebhook", {"drop_pending_updates": "true"})
                 break
             except urllib.error.URLError:
                 self.status("Telegram offline; reconnecting…")
@@ -101,7 +123,13 @@ class TelegramAdapter:
                     continue
                 if chat_id != self.authorized_chat_id:
                     continue
+                if text.casefold() in {"/status", "/ping"}:
+                    self.send_message(chat_id, "Remote control is online and ready.")
+                    continue
                 if text.casefold() in {"/start", "/help", "/commands"}:
                     text = "show commands"
                 response = on_command(text)
-                self.send_message(chat_id, response)
+                self.send_message(chat_id, response.text)
+                if response.should_exit:
+                    self.exit_requested = True
+                    return
