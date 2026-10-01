@@ -98,10 +98,10 @@ class WindowsController:
     def open_calculator(self) -> None:
         self._launch("calc.exe")
 
-    def open_app(self, spoken_name: str) -> str:
-        entry = self.app_catalog.find(spoken_name)
+    def open_app(self, app_name: str) -> str:
+        entry = self.app_catalog.find(app_name)
         if entry is None:
-            raise ValueError(f"Application not found: {spoken_name}")
+            raise ValueError(f"Application not found: {app_name}")
         if entry.kind == "aumid":
             subprocess.Popen(
                 ["explorer.exe", f"shell:AppsFolder\\{entry.target}"], close_fds=True
@@ -112,10 +112,10 @@ class WindowsController:
             self._launch(entry.target)
         return entry.name
 
-    def close_app(self, spoken_name: str) -> str:
-        entry = self.app_catalog.find(spoken_name)
+    def close_app(self, app_name: str) -> str:
+        entry = self.app_catalog.find(app_name)
         if entry is None:
-            raise ValueError(f"Application not found: {spoken_name}")
+            raise ValueError(f"Application not found: {app_name}")
 
         from ctypes import wintypes
 

@@ -51,7 +51,7 @@ class Action(str, Enum):
 @dataclass(frozen=True)
 class Command:
     action: Action
-    spoken_text: str
+    source_text: str
     argument: Optional[str] = None
     needs_confirmation: bool = False
 
@@ -219,18 +219,6 @@ def _parse_volume(normalized: str) -> Optional[int]:
     return None
 
 
-def grammar_phrases(app_names: Iterable[str] = ()) -> list[str]:
-    """Phrases supplied to Vosk to improve speed and command accuracy."""
-    phrases = list(PHRASES)
-    for name in app_names:
-        phrases.extend(f"{prefix}{name}" for prefix in APP_PREFIXES)
-        phrases.extend(f"{prefix}{name}" for prefix in CLOSE_APP_PREFIXES)
-    for value in range(101):
-        spoken = number_words(value)
-        phrases.extend((f"volume {spoken}", f"set volume to {spoken} percent"))
-    return list(dict.fromkeys(phrases)) + ["[unk]"]
-
-
 class CommandParser:
     def __init__(self, app_catalog=None) -> None:
         self.app_catalog = app_catalog
@@ -239,7 +227,7 @@ class CommandParser:
         normalized = " ".join(text.lower().strip().split())
         action = PHRASES.get(normalized)
         if action is not None:
-            return Command(action=action, spoken_text=normalized)
+            return Command(action=action, source_text=normalized)
         volume = _parse_volume(normalized)
         if volume is not None:
             return Command(Action.SET_VOLUME, normalized, argument=str(volume))
@@ -249,13 +237,13 @@ class CommandParser:
                     name = normalized[len(prefix) :]
                     entry = self.app_catalog.find(name)
                     if entry:
-                        return Command(Action.OPEN_APP, normalized, argument=entry.spoken_name)
+                        return Command(Action.OPEN_APP, normalized, argument=entry.command_name)
             for prefix in CLOSE_APP_PREFIXES:
                 if normalized.startswith(prefix):
                     name = normalized[len(prefix) :]
                     entry = self.app_catalog.find(name)
                     if entry:
-                        return Command(Action.CLOSE_APP, normalized, argument=entry.spoken_name)
+                        return Command(Action.CLOSE_APP, normalized, argument=entry.command_name)
         return None
 
 

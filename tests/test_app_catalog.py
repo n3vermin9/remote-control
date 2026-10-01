@@ -10,11 +10,11 @@ class AppCatalogTests(unittest.TestCase):
         catalog = AppCatalog([AppEntry("Visual Studio Code", "Code.exe")])
         self.assertEqual(catalog.find("visual-studio code").target, "Code.exe")
 
-    def test_ampersand_is_spoken_as_and(self):
+    def test_ampersand_is_normalized_as_and(self):
         catalog = AppCatalog([AppEntry("Movies & TV", "movies.exe")])
         self.assertEqual(catalog.find("movies and tv").target, "movies.exe")
 
-    def test_duplicate_spoken_names_keep_first_safe_target(self):
+    def test_duplicate_command_names_keep_first_safe_target(self):
         catalog = AppCatalog(
             [AppEntry("My App", "first.exe"), AppEntry("My-App", "second.exe")]
         )

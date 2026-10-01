@@ -6,7 +6,8 @@ from pathlib import Path
 
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-VALUE_NAME = "RemoteControlVoice"
+VALUE_NAME = "RemoteControlTelegram"
+LEGACY_VALUE_NAME = "RemoteControlVoice"
 
 
 def _command() -> str:
@@ -21,6 +22,10 @@ def install_autostart() -> None:
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
         winreg.SetValueEx(key, VALUE_NAME, 0, winreg.REG_SZ, _command())
+        try:
+            winreg.DeleteValue(key, LEGACY_VALUE_NAME)
+        except FileNotFoundError:
+            pass
 
 
 def remove_autostart() -> None:
@@ -30,7 +35,11 @@ def remove_autostart() -> None:
 
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
-            winreg.DeleteValue(key, VALUE_NAME)
+            for value_name in (VALUE_NAME, LEGACY_VALUE_NAME):
+                try:
+                    winreg.DeleteValue(key, value_name)
+                except FileNotFoundError:
+                    pass
     except FileNotFoundError:
         pass
 

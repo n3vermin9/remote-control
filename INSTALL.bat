@@ -49,29 +49,26 @@ goto :python_ready
 if errorlevel 1 goto :python_unsupported
 
 if not exist ".venv\Scripts\python.exe" (
-    echo [1/6] Creating the private Python environment...
+    echo [1/5] Creating the private Python environment...
     %PYTHON_COMMAND% -m venv ".venv"
     if errorlevel 1 goto :failed
 ) else (
-    echo [1/6] Python environment already exists.
+    echo [1/5] Python environment already exists.
 )
 
-echo [2/6] Updating the installer tools...
+echo [2/5] Updating the installer tools...
 ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check --upgrade pip
 if errorlevel 1 goto :failed
 
-echo [3/6] Installing Remote control and its free dependencies...
+echo [3/5] Removing legacy voice, webcam, and F8 components...
+".venv\Scripts\python.exe" -m pip uninstall --yes remote-control-voice vosk sounddevice mediapipe opencv-contrib-python opencv-python pynput >nul 2>nul
+if exist "%LOCALAPPDATA%\RemoteControlVoice" rmdir /s /q "%LOCALAPPDATA%\RemoteControlVoice"
+
+echo [4/5] Installing Telegram Remote control and its free dependencies...
 ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -e .
 if errorlevel 1 goto :failed
 
-echo [4/6] Removing legacy webcam and F8 packages...
-".venv\Scripts\python.exe" -m pip uninstall --yes mediapipe opencv-contrib-python opencv-python pynput >nul 2>nul
-
-echo [5/6] Installing the offline voice model...
-".venv\Scripts\python.exe" "scripts\download_model.py"
-if errorlevel 1 goto :failed
-
-echo [6/6] Enabling start with Windows...
+echo [5/5] Enabling start with Windows...
 ".venv\Scripts\remote-control.exe" --install-autostart
 if errorlevel 1 goto :failed
 
@@ -81,6 +78,7 @@ echo   Installation completed successfully.
 echo ========================================
 echo.
 echo Remote control now starts with Windows and stays in the system tray.
+echo Open it once to enter your Telegram bot token and authorized chat ID.
 echo Double-click START.bat to start it now.
 echo.
 pause

@@ -23,7 +23,7 @@ class AppEntry:
     kind: str = "path"
 
     @property
-    def spoken_name(self) -> str:
+    def command_name(self) -> str:
         return normalize_app_name(self.name)
 
 
@@ -31,25 +31,21 @@ class AppCatalog:
     def __init__(self, entries: Iterable[AppEntry] = ()) -> None:
         self._entries: Dict[str, AppEntry] = {}
         for entry in entries:
-            key = entry.spoken_name
+            key = entry.command_name
             if key and key not in self._entries:
                 self._entries[key] = entry
 
     def add(self, entry: AppEntry) -> None:
-        key = entry.spoken_name
+        key = entry.command_name
         if key and key not in self._entries:
             self._entries[key] = entry
 
-    def find(self, spoken_name: str) -> Optional[AppEntry]:
-        return self._entries.get(normalize_app_name(spoken_name))
+    def find(self, command_name: str) -> Optional[AppEntry]:
+        return self._entries.get(normalize_app_name(command_name))
 
     @property
     def entries(self) -> Sequence[AppEntry]:
         return tuple(sorted(self._entries.values(), key=lambda item: item.name.casefold()))
-
-    @property
-    def spoken_names(self) -> Sequence[str]:
-        return tuple(sorted(self._entries))
 
     def __len__(self) -> int:
         return len(self._entries)

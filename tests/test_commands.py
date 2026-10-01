@@ -1,7 +1,7 @@
 import unittest
 
 from remote_control.app_catalog import AppCatalog, AppEntry
-from remote_control.commands import Action, Command, CommandParser, grammar_phrases
+from remote_control.commands import Action, Command, CommandParser
 from remote_control.executor import CommandExecutor
 
 
@@ -12,12 +12,12 @@ class FakeController:
     def __getattr__(self, name):
         return lambda: self.calls.append(name)
 
-    def open_app(self, spoken_name):
-        self.calls.append(("open_app", spoken_name))
+    def open_app(self, app_name):
+        self.calls.append(("open_app", app_name))
         return "Visual Studio Code"
 
-    def close_app(self, spoken_name):
-        self.calls.append(("close_app", spoken_name))
+    def close_app(self, app_name):
+        self.calls.append(("close_app", app_name))
         return "Visual Studio Code"
 
     def set_volume(self, percent):
@@ -32,12 +32,6 @@ class CommandTests(unittest.TestCase):
     def test_unknown_command_is_ignored(self):
         self.assertIsNone(CommandParser().parse("delete all files"))
 
-    def test_vosk_grammar_contains_unknown_token(self):
-        self.assertIn("open calculator", grammar_phrases())
-        self.assertIn("next song", grammar_phrases())
-        self.assertNotIn("next track", grammar_phrases())
-        self.assertIn("[unk]", grammar_phrases())
-
     def test_parser_opens_an_installed_app_by_name(self):
         catalog = AppCatalog([AppEntry("Visual Studio Code", "Code.exe")])
         command = CommandParser(catalog).parse("launch visual studio code")
@@ -46,17 +40,7 @@ class CommandTests(unittest.TestCase):
             Command(Action.OPEN_APP, "launch visual studio code", "visual studio code"),
         )
 
-    def test_app_names_are_added_to_voice_grammar(self):
-        phrases = grammar_phrases(["visual studio code"])
-        self.assertIn("open visual studio code", phrases)
-        self.assertIn("start visual studio code", phrases)
-        self.assertIn("launch visual studio code", phrases)
-        self.assertIn("run visual studio code", phrases)
-        self.assertIn("open up visual studio code", phrases)
-        self.assertIn("close visual studio code", phrases)
-        self.assertIn("quit visual studio code", phrases)
-
-    def test_exact_volume_accepts_digits_and_spoken_numbers(self):
+    def test_exact_volume_accepts_digits_and_number_words(self):
         parser = CommandParser()
         for phrase in ("volume 37", "volume thirty seven", "set volume to thirty seven percent"):
             with self.subTest(phrase=phrase):

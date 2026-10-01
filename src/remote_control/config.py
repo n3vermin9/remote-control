@@ -7,17 +7,14 @@ from pathlib import Path
 from typing import Optional
 
 
-APP_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "RemoteControlVoice"
-DEFAULT_MODEL_DIR = APP_DIR / "models" / "vosk-model-small-en-us-0.15"
+APP_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "RemoteControlTelegram"
 CONFIG_PATH = APP_DIR / "config.json"
 
 
 @dataclass
 class Settings:
-    model_path: str = str(DEFAULT_MODEL_DIR)
-    input_device: Optional[int] = None
-    sample_rate: Optional[int] = None
-    command_timeout_seconds: float = 8.0
+    telegram_token: str = ""
+    authorized_chat_id: Optional[int] = None
 
     @classmethod
     def load(cls, path: Path = CONFIG_PATH) -> "Settings":

@@ -6,17 +6,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class EasyInstallTests(unittest.TestCase):
-    def test_installer_bootstraps_environment_model_and_autostart(self):
+    def test_installer_bootstraps_telegram_app_and_autostart(self):
         installer = (ROOT / "INSTALL.bat").read_text(encoding="utf-8")
         self.assertIn('-m venv ".venv"', installer)
         self.assertIn("-m pip install --disable-pip-version-check -e .", installer)
-        self.assertIn('"scripts\\download_model.py"', installer)
         self.assertIn("--install-autostart", installer)
-        self.assertIn("pip uninstall --yes mediapipe", installer)
+        self.assertIn("pip uninstall --yes remote-control-voice", installer)
+        self.assertIn("vosk", installer)
+        self.assertIn("sounddevice", installer)
         self.assertIn("opencv-contrib-python", installer)
         self.assertIn("pynput", installer)
-        self.assertNotIn("hand_landmarker", installer)
-        self.assertNotIn("pose_landmarker", installer)
+        self.assertNotIn("download_model.py", installer)
 
     def test_launcher_starts_hidden_without_f8_mode(self):
         launcher = (ROOT / "START.bat").read_text(encoding="utf-8")
