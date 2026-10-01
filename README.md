@@ -4,6 +4,17 @@ A first working prototype for controlling a Windows PC with **English voice comm
 
 The default interaction is push-to-talk: hold **F8**, say one command, and release F8. An optional always-listening mode is included.
 
+## Easy Windows installation
+
+1. On GitHub, click **Code → Download ZIP**, then extract the ZIP.
+2. Open the extracted `remote-control-main` folder.
+3. Double-click **`INSTALL.bat`**. It creates an isolated environment, installs the app, and downloads the offline English model automatically.
+4. Double-click **`START.bat`** whenever you want to run the recommended push-to-talk mode.
+
+For continuous listening, double-click **`START_ALWAYS_LISTENING.bat`** instead. The launchers automatically start `INSTALL.bat` if setup has not been completed yet. `START_F8.bat` is also included as an explicit name for the default mode.
+
+The only prerequisite is 64-bit Python 3.9–3.12. If Python is missing, the installer shows the official download address and the exact option to select. Installation needs internet once for the free dependencies and speech model; normal use is fully offline.
+
 ## Privacy and cost
 
 - Microphone audio is processed in memory on this PC and is not saved or uploaded.
@@ -11,9 +22,9 @@ The default interaction is push-to-talk: hold **F8**, say one command, and relea
 - The model and Python libraries are free and open source. No API key is used.
 - `scripts/download_model.py` makes one HTTPS download from the official Vosk model host. You can instead download and copy the model manually from another computer.
 
-## Windows setup
+## Manual Windows setup
 
-Install 64-bit Python 3.9–3.12 from [python.org](https://www.python.org/downloads/windows/) and select **Add Python to PATH** during installation. Then open PowerShell in this project folder:
+Use this section only if you prefer the command line or the easy installer cannot run. Install 64-bit Python 3.9–3.12 from [python.org](https://www.python.org/downloads/windows/) and select **Add Python to PATH** during installation. Then open PowerShell in this project folder:
 
 ```powershell
 py -m venv .venv
