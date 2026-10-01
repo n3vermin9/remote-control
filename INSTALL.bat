@@ -49,23 +49,27 @@ goto :python_ready
 if errorlevel 1 goto :python_unsupported
 
 if not exist ".venv\Scripts\python.exe" (
-    echo [1/4] Creating the private Python environment...
+    echo [1/5] Creating the private Python environment...
     %PYTHON_COMMAND% -m venv ".venv"
     if errorlevel 1 goto :failed
 ) else (
-    echo [1/4] Python environment already exists.
+    echo [1/5] Python environment already exists.
 )
 
-echo [2/4] Updating the installer tools...
+echo [2/5] Updating the installer tools...
 ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check --upgrade pip
 if errorlevel 1 goto :failed
 
-echo [3/4] Installing Remote control and its free dependencies...
+echo [3/5] Installing Remote control and its free dependencies...
 ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -e .
 if errorlevel 1 goto :failed
 
-echo [4/4] Installing the offline voice and webcam models...
+echo [4/5] Installing the offline voice model...
 ".venv\Scripts\python.exe" "scripts\download_model.py"
+if errorlevel 1 goto :failed
+
+echo [5/5] Enabling start with Windows...
+".venv\Scripts\remote-control.exe" --install-autostart
 if errorlevel 1 goto :failed
 
 echo.
@@ -73,8 +77,8 @@ echo ========================================
 echo   Installation completed successfully.
 echo ========================================
 echo.
-echo Double-click START.bat to use push-to-talk.
-echo Double-click START_ALWAYS_LISTENING.bat for continuous listening.
+echo Remote control now starts with Windows and stays in the system tray.
+echo Double-click START.bat to start it now.
 echo.
 pause
 exit /b 0

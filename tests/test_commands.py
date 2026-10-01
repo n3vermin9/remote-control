@@ -16,6 +16,13 @@ class FakeController:
         self.calls.append(("open_app", spoken_name))
         return "Visual Studio Code"
 
+    def close_app(self, spoken_name):
+        self.calls.append(("close_app", spoken_name))
+        return "Visual Studio Code"
+
+    def set_volume(self, percent):
+        self.calls.append(("set_volume", percent))
+
 
 class CommandTests(unittest.TestCase):
     def test_parser_normalizes_text(self):
@@ -46,6 +53,27 @@ class CommandTests(unittest.TestCase):
         self.assertIn("launch visual studio code", phrases)
         self.assertIn("run visual studio code", phrases)
         self.assertIn("open up visual studio code", phrases)
+        self.assertIn("close visual studio code", phrases)
+        self.assertIn("quit visual studio code", phrases)
+
+    def test_exact_volume_accepts_digits_and_spoken_numbers(self):
+        parser = CommandParser()
+        for phrase in ("volume 37", "volume thirty seven", "set volume to thirty seven percent"):
+            with self.subTest(phrase=phrase):
+                self.assertEqual(
+                    parser.parse(phrase),
+                    Command(Action.SET_VOLUME, phrase, "37"),
+                )
+        self.assertIsNone(parser.parse("volume 101"))
+
+    def test_parser_closes_only_a_recognized_app(self):
+        catalog = AppCatalog([AppEntry("Visual Studio Code", "Code.exe")])
+        parser = CommandParser(catalog)
+        self.assertEqual(
+            parser.parse("close visual studio code"),
+            Command(Action.CLOSE_APP, "close visual studio code", "visual studio code"),
+        )
+        self.assertIsNone(parser.parse("close imaginary program"))
 
     def test_common_variations_map_to_safe_actions(self):
         cases = {
@@ -59,6 +87,10 @@ class CommandTests(unittest.TestCase):
             "capture screen": Action.SCREENSHOT,
             "previous page": Action.BROWSER_BACK,
             "scroll down": Action.SCROLL_DOWN,
+            "copy this": Action.COPY,
+            "reopen closed tab": Action.REOPEN_TAB,
+            "reset zoom": Action.ZOOM_RESET,
+            "close this window": Action.CLOSE_WINDOW,
         }
         parser = CommandParser()
         for phrase, action in cases.items():
@@ -79,6 +111,22 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(controller.calls, ["volume_up"])
         self.assertEqual(result.message, "Volume up")
         self.assertFalse(result.should_quit)
+
+    def test_executor_sets_exact_volume(self):
+        controller = FakeController()
+        result = CommandExecutor(controller).execute(
+            Command(Action.SET_VOLUME, "volume 64", "64")
+        )
+        self.assertEqual(controller.calls, [("set_volume", 64)])
+        self.assertEqual(result.message, "Volume set to 64%")
+
+    def test_executor_closes_dynamic_app(self):
+        controller = FakeController()
+        result = CommandExecutor(controller).execute(
+            Command(Action.CLOSE_APP, "close visual studio code", "visual studio code")
+        )
+        self.assertEqual(controller.calls, [("close_app", "visual studio code")])
+        self.assertEqual(result.message, "Closing Visual Studio Code")
 
     def test_quit_does_not_call_platform_layer(self):
         controller = FakeController()

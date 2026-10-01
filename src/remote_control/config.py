@@ -9,20 +9,15 @@ from typing import Optional
 
 APP_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "RemoteControlVoice"
 DEFAULT_MODEL_DIR = APP_DIR / "models" / "vosk-model-small-en-us-0.15"
-CAMERA_MODELS_DIR = APP_DIR / "models" / "camera"
-HAND_MODEL_PATH = CAMERA_MODELS_DIR / "hand_landmarker.task"
-POSE_MODEL_PATH = CAMERA_MODELS_DIR / "pose_landmarker_lite.task"
 CONFIG_PATH = APP_DIR / "config.json"
 
 
 @dataclass
 class Settings:
-    mode: str = "f8"
     model_path: str = str(DEFAULT_MODEL_DIR)
     input_device: Optional[int] = None
     sample_rate: Optional[int] = None
     command_timeout_seconds: float = 8.0
-    camera_index: int = 0
 
     @classmethod
     def load(cls, path: Path = CONFIG_PATH) -> "Settings":
